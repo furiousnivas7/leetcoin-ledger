@@ -1,29 +1,34 @@
 (function () {
-  const MAX_PLAUSIBLE_BALANCE = 1000000;
+  const FIELDS = {
+    balance: { keyword: 'coin', max: 1000000 },
+    rank: { keyword: 'rank', max: 100000000 },
+    streak: { keyword: 'streak', max: 100000 },
+    solved: { keyword: 'solved', max: 100000 },
+  };
 
-  function parseNumber(text) {
+  function parseNumber(text, max) {
     if (!text) return null;
     const cleaned = text.replace(/[,\s]/g, '');
     if (!/^\d+$/.test(cleaned)) return null;
     const n = parseInt(cleaned, 10);
-    return n < MAX_PLAUSIBLE_BALANCE ? n : null;
+    return n < max ? n : null;
   }
 
-  function tryOverrideSelector(selector) {
+  function tryOverrideSelector(selector, max) {
     if (!selector) return null;
     try {
       const el = document.querySelector(selector);
-      if (el) return parseNumber(el.textContent.trim());
+      if (el) return parseNumber(el.textContent.trim(), max);
     } catch (e) {
       // invalid selector from user input, ignore
     }
     return null;
   }
 
-  // LeetCode doesn't publish a stable selector for this, so we scan for
-  // anything referencing "coin" in its attributes/class, then look for a
-  // plain number on that element or one of its immediate siblings.
-  function heuristicScan() {
+  // LeetCode doesn't publish stable selectors for any of this, so we scan for
+  // anything referencing the field's keyword in its attributes/class, then
+  // look for a plain number on that element or one of its immediate siblings.
+  function heuristicScan(keyword, max) {
     const candidates = new Set();
     document.querySelectorAll('[aria-label],[title],[alt],[data-testid],[class]').forEach((el) => {
       const cls = typeof el.className === 'string' ? el.className : '';
@@ -34,17 +39,17 @@
         el.getAttribute('data-testid'),
         cls,
       ].filter(Boolean).join(' ').toLowerCase();
-      if (hay.includes('coin')) candidates.add(el);
+      if (hay.includes(keyword)) candidates.add(el);
     });
 
     for (const el of candidates) {
-      let n = parseNumber(el.textContent && el.textContent.trim());
+      let n = parseNumber(el.textContent && el.textContent.trim(), max);
       if (n !== null) return n;
       const parent = el.parentElement;
       if (parent) {
         for (const sib of parent.children) {
           if (sib === el) continue;
-          n = parseNumber(sib.textContent && sib.textContent.trim());
+          n = parseNumber(sib.textContent && sib.textContent.trim(), max);
           if (n !== null) return n;
         }
       }
@@ -53,18 +58,34 @@
   }
 
   async function scan() {
-    const { leetcoinSelectorOverride } = await chrome.storage.local.get('leetcoinSelectorOverride');
-    let balance = tryOverrideSelector(leetcoinSelectorOverride);
-    let source = 'override';
-    if (balance === null) {
-      balance = heuristicScan();
-      source = 'heuristic';
+    const { leetcoinSelectorOverrides } = await chrome.storage.local.get('leetcoinSelectorOverrides');
+    const overrides = leetcoinSelectorOverrides || {};
+    const found = {};
+    const sources = {};
+
+    for (const [field, cfg] of Object.entries(FIELDS)) {
+      let value = tryOverrideSelector(overrides[field], cfg.max);
+      let source = 'override';
+      if (value === null) {
+        value = heuristicScan(cfg.keyword, cfg.max);
+        source = 'heuristic';
+      }
+      if (value !== null) {
+        found[field] = value;
+        sources[field] = source;
+      }
     }
-    if (balance !== null) {
+
+    if (Object.keys(found).length > 0) {
+      const { leetcoinScrape: prev } = await chrome.storage.local.get('leetcoinScrape');
       await chrome.storage.local.set({
-        leetcoinScrape: { balance, scrapedAt: Date.now(), source },
+        // merge so navigating off the profile page (where rank/streak/solved
+        // live) doesn't wipe out fields we're no longer seeing on this page
+        leetcoinScrape: { ...prev, ...found, sources, scrapedAt: Date.now() },
       });
-    } else {
+    }
+
+    if (found.balance === undefined) {
       await chrome.storage.local.set({
         leetcoinScrapeStatus: { found: false, checkedAt: Date.now() },
       });

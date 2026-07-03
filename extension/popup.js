@@ -5,18 +5,22 @@ function timeAgo(ts) {
   return Math.floor(s / 3600) + 'h ago';
 }
 
+function setStat(id, value) {
+  document.getElementById(id).textContent = typeof value === 'number' ? value.toLocaleString() : '-';
+}
+
 async function refresh() {
-  const { leetcoinScrape, leetcoinScrapeStatus, leetcoinSelectorOverride } = await chrome.storage.local.get([
+  const { leetcoinScrape, leetcoinScrapeStatus, leetcoinSelectorOverrides } = await chrome.storage.local.get([
     'leetcoinScrape',
     'leetcoinScrapeStatus',
-    'leetcoinSelectorOverride',
+    'leetcoinSelectorOverrides',
   ]);
   const balEl = document.getElementById('balanceVal');
   const metaEl = document.getElementById('statusMeta');
 
   if (leetcoinScrape && typeof leetcoinScrape.balance === 'number') {
     balEl.textContent = leetcoinScrape.balance.toLocaleString();
-    metaEl.textContent = 'via ' + leetcoinScrape.source + ' · ' + timeAgo(leetcoinScrape.scrapedAt);
+    metaEl.textContent = 'via ' + (leetcoinScrape.sources && leetcoinScrape.sources.balance) + ' · ' + timeAgo(leetcoinScrape.scrapedAt);
   } else if (leetcoinScrapeStatus && leetcoinScrapeStatus.found === false) {
     balEl.textContent = '-';
     metaEl.textContent = 'not found on last scan (' + timeAgo(leetcoinScrapeStatus.checkedAt) + ') — try a manual selector below';
@@ -25,7 +29,13 @@ async function refresh() {
     metaEl.textContent = 'no scrape yet — open leetcode.com';
   }
 
-  document.getElementById('overrideInput').value = leetcoinSelectorOverride || '';
+  setStat('rankVal', leetcoinScrape && leetcoinScrape.rank);
+  setStat('streakVal', leetcoinScrape && leetcoinScrape.streak);
+  setStat('solvedVal', leetcoinScrape && leetcoinScrape.solved);
+
+  const overrides = leetcoinSelectorOverrides || {};
+  const field = document.getElementById('overrideField').value;
+  document.getElementById('overrideInput').value = overrides[field] || '';
 }
 
 document.getElementById('rescanBtn').addEventListener('click', async () => {
@@ -46,10 +56,17 @@ document.getElementById('copyBtn').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('overrideField').addEventListener('change', refresh);
+
 document.getElementById('saveOverrideBtn').addEventListener('click', async () => {
+  const field = document.getElementById('overrideField').value;
   const val = document.getElementById('overrideInput').value.trim();
-  await chrome.storage.local.set({ leetcoinSelectorOverride: val });
-  document.getElementById('statusMeta').textContent = val ? 'selector saved' : 'selector cleared';
+  const { leetcoinSelectorOverrides } = await chrome.storage.local.get('leetcoinSelectorOverrides');
+  const overrides = leetcoinSelectorOverrides || {};
+  if (val) overrides[field] = val;
+  else delete overrides[field];
+  await chrome.storage.local.set({ leetcoinSelectorOverrides: overrides });
+  document.getElementById('statusMeta').textContent = val ? field + ' selector saved' : field + ' selector cleared';
 });
 
 refresh();

@@ -30,8 +30,23 @@
   }
   .status .big { color: #e0b34d; font-size: 20px; font-weight: 700; }
   .status .meta { color: #7c8f88; font-size: 11px; margin-top: 4px; }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat {
+    background: #121917;
+    border: 1px solid #22302b;
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .stat .k { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: #7c8f88; margin-bottom: 4px; }
+  .stat .v { font-family: 'SF Mono', Menlo, monospace; font-size: 14px; color: #dbe6e1; }
   label { display: block; margin-bottom: 4px; color: #7c8f88; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
-  input[type=text] {
+  select, input[type=text] {
     width: 100%;
     box-sizing: border-box;
     background: #161f1c;
@@ -70,11 +85,24 @@
     <div class="meta" id="statusMeta">no scrape yet — open leetcode.com</div>
   </div>
 
+  <div class="stats-grid">
+    <div class="stat"><span class="k">Rank</span><span class="v" id="rankVal">-</span></div>
+    <div class="stat"><span class="k">Streak</span><span class="v" id="streakVal">-</span></div>
+    <div class="stat"><span class="k">Solved</span><span class="v" id="solvedVal">-</span></div>
+  </div>
+
   <button id="rescanBtn">Re-scan current tab</button>
   <button id="copyBtn" class="ghost">Copy balance</button>
 
-  <p class="hint">If the balance above is wrong or missing, open leetcode.com, right-click the LeetCoin number → Inspect, and paste a CSS selector for it below.</p>
-  <label for="overrideInput">Manual selector override</label>
+  <p class="hint">If a value above is wrong or missing, open leetcode.com, right-click the number → Inspect, copy a CSS selector for it, pick the field below, and save.</p>
+  <label for="overrideField">Field to override</label>
+  <select id="overrideField">
+    <option value="balance">Balance</option>
+    <option value="rank">Rank</option>
+    <option value="streak">Streak</option>
+    <option value="solved">Solved</option>
+  </select>
+  <label for="overrideInput">CSS selector</label>
   <input type="text" id="overrideInput" placeholder="e.g. [data-testid=coin-count]">
   <button id="saveOverrideBtn" class="ghost">Save selector</button>
 
