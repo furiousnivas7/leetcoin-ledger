@@ -682,12 +682,55 @@ function setupEvents(){
     await saveData();
     render();
   });
+
+  const ioMsg = document.getElementById('ioMsg');
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'leetcoin-ledger-backup-' + todayKey() + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    ioMsg.textContent = 'backup downloaded';
+    setTimeout(() => ioMsg.textContent = '', 3000);
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+  });
+
+  document.getElementById('importFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if(typeof parsed.startingBalance !== 'number' || typeof parsed.goal !== 'number'){
+        throw new Error('not a valid backup file');
+      }
+      data = parsed;
+      normalizeData();
+      await saveData();
+      render();
+      ioMsg.textContent = 'backup restored';
+      setTimeout(() => ioMsg.textContent = '', 3000);
+    }catch(err){
+      ioMsg.style.color = 'var(--rust)';
+      ioMsg.textContent = 'import failed: ' + err.message;
+      setTimeout(() => { ioMsg.textContent = ''; ioMsg.style.color = 'var(--green)'; }, 4000);
+    }
+    e.target.value = '';
+  });
 }
 
 (async function init(){
   await loadData();
   setupEvents();
   render();
+  if(!storageAvailable){
+    document.getElementById('storageWarning').style.display = 'block';
+  }
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
 })();
