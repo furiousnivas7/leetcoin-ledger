@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCoin Ledger Sync",
+  "version": "1.0.0",
+  "description": "Reads your LeetCoin balance while you're on leetcode.com and auto-fills it into your local LeetCoin Ledger tracker's sync box.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://leetcode.com/*",
+    "file:///*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/*"],
+      "js": ["content-leetcode.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["file:///*"],
+      "js": ["content-tracker.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LeetCoin Ledger Sync"
+  }
+}
