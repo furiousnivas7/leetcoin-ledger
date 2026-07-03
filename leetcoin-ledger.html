@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LeetCoin ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0f0e;
+    --panel: #121917;
+    --panel-2: #161f1c;
+    --line: #22302b;
+    --text: #dbe6e1;
+    --muted: #7c8f88;
+    --gold: #e0b34d;
+    --gold-dim: #6b5527;
+    --green: #4fd1a5;
+    --green-dim: #1f4438;
+    --rust: #d9704f;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    padding:32px 20px 60px;
+    display:flex;
+    justify-content:center;
+  }
+  .wrap{width:100%;max-width:720px;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--green);
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:500;
+    font-size:26px;
+    margin:0 0 20px;
+    color:var(--text);
+  }
+  .balance-row{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    font-family:'JetBrains Mono',monospace;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+  }
+  .balance-row .big{font-size:40px;font-weight:700;color:var(--gold);}
+  .balance-row .of{color:var(--muted);font-size:16px;}
+  .balance-row .goal{font-size:20px;color:var(--text);}
+  .bar-track{
+    height:10px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:6px;
+    overflow:hidden;
+    margin-bottom:6px;
+  }
+  .bar-fill{
+    height:100%;
+    background:linear-gradient(90deg,var(--green-dim),var(--gold));
+    width:0%;
+    transition:width .4s ease;
+  }
+  .pct-line{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:28px;
+  }
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:10px;
+    margin-bottom:28px;
+  }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:12px 14px;
+  }
+  .stat .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+  .stat .val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:500;}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    margin-bottom:16px;
+  }
+  .panel h2{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+    margin:0 0 14px;
+    font-weight:500;
+  }
+  .check-row{
+    display:flex;
+    align-items:center;
+    justify-between:space-between;
+    gap:12px;
+    padding:8px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .check-row:last-child{border-bottom:none;}
+  .check-row label{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    cursor:pointer;
+    font-size:14px;
+  }
+  .check-row input[type=checkbox]{
+    width:18px;height:18px;
+    accent-color:var(--green);
+    cursor:pointer;
+  }
+  .coin-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--gold);
+    background:rgba(224,179,77,.1);
+    border:1px solid var(--gold-dim);
+    border-radius:5px;
+    padding:2px 7px;
+    white-space:nowrap;
+  }
+  .heatmap{
+    display:grid;
+    grid-template-columns:repeat(20,1fr);
+    gap:4px;
+  }
+  .cell{
+    aspect-ratio:1;
+    border-radius:3px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+  }
+  .cell.l1{background:var(--green-dim);}
+  .cell.l2{background:#2c6551;}
+  .cell.l3{background:var(--green);}
+  .heat-legend{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-top:10px;
+    font-size:11px;
+    color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+  }
+  .heat-legend .cell{width:11px;height:11px;aspect-ratio:unset;}
+  .add-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  select, input[type=text], input[type=number]{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:6px;
+    padding:8px 10px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+  }
+  select{flex:1;min-width:140px;}
+  input[type=text]{flex:2;min-width:140px;}
+  input[type=number]{width:80px;}
+  button{
+    background:var(--gold);
+    color:#26200e;
+    border:none;
+    border-radius:6px;
+    padding:8px 14px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+  }
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--muted);
+    font-weight:500;
+    padding:6px 10px;
+  }
+  .ledger-list{max-height:260px;overflow-y:auto;}
+  .ledger-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    padding:7px 0;
+    border-bottom:1px dashed var(--line);
+  }
+  .ledger-item:last-child{border-bottom:none;}
+  .ledger-item .desc{color:var(--text);}
+  .ledger-item .date{color:var(--muted);margin-left:8px;}
+  .ledger-item .amt{color:var(--gold);}
+  .ledger-item .del{color:var(--rust);cursor:pointer;margin-left:10px;font-size:11px;}
+  .settings-row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    font-size:13px;
+    color:var(--muted);
+    flex-wrap:wrap;
+  }
+  .settings-row input{width:100px;}
+  .empty{color:var(--muted);font-size:13px;font-style:italic;}
+  .loading{color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">// leetcoin ledger</p>
+  <h1>Grind tracker</h1>
+
+  <div id="loading" class="loading">loading ledger...</div>
+
+  <div id="app" style="display:none;">
+
+    <div class="balance-row">
+      <span class="big" id="currentBalance">0</span>
+      <span class="of">/</span>
+      <span class="goal" id="goalDisplay">6500</span>
+      <span class="of">coins</span>
+    </div>
+    <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+    <div class="pct-line" id="pctLine">0% to cap</div>
+
+    <div class="panel" id="syncPanel">
+      <h2>Sync with your LeetCode page</h2>
+      <div class="settings-row" style="margin-bottom:10px;">
+        <span>Username</span>
+        <input type="text" id="lcUsername" placeholder="your-handle" style="width:160px;">
+        <a id="profileLink" href="#" target="_blank" rel="noopener">
+          <button class="ghost" type="button">Open my profile ↗</button>
+        </a>
+      </div>
+      <p class="empty" style="margin:0 0 10px;">LeetCode doesn't expose coin balance to outside pages, so this can't read it automatically. Open your profile, check the number under your avatar, then paste it below.</p>
+      <div class="settings-row">
+        <span>Balance shown on profile</span>
+        <input type="number" id="syncAmt" placeholder="e.g. 3120">
+        <button id="syncBtn">Sync</button>
+        <span id="syncMsg" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green);"></span>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Remaining</div>
+        <div class="val" id="remainingVal">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Earned so far</div>
+        <div class="val" id="earnedVal">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Est. days left</div>
+        <div class="val" id="etaVal">-</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Today</h2>
+      <div class="check-row">
+        <label><input type="checkbox" id="checkin"> Daily check-in</label>
+        <span class="coin-tag">+1</span>
+      </div>
+      <div class="check-row">
+        <label><input type="checkbox" id="challenge"> Daily challenge solved</label>
+        <span class="coin-tag">+10</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>This week</h2>
+      <div class="check-row">
+        <label><input type="checkbox" id="weekly"> Weekly contest joined</label>
+        <span class="coin-tag">+5</span>
+      </div>
+      <div class="check-row">
+        <label><input type="checkbox" id="biweekly"> Biweekly contest joined</label>
+        <span class="coin-tag">+5</span>
+      </div>
+      <div class="check-row" id="dualRow" style="display:none;">
+        <label>Both contests bonus</label>
+        <span class="coin-tag">+25</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Activity, last 100 days</h2>
+      <div class="heatmap" id="heatmap"></div>
+      <div class="heat-legend">
+        <span>less</span>
+        <div class="cell"></div><div class="cell l1"></div><div class="cell l2"></div><div class="cell l3"></div>
+        <span>more</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Contribution ledger</h2>
+      <div class="add-row">
+        <select id="contribType">
+          <option value="100|Testcase accepted">Testcase accepted (+100)</option>
+          <option value="1000|Question accepted">Question accepted (+1000)</option>
+          <option value="100|Violation report accepted">Violation report (+100)</option>
+          <option value="30|30-day check-in streak">30-day check-in streak (+30)</option>
+          <option value="25|25-day challenge streak">25-day challenge streak (+25)</option>
+          <option value="50|Full month of daily challenges">Full month daily challenges (+50)</option>
+          <option value="200|First contest submission">First contest submission (+200)</option>
+          <option value="custom|Other">Other, custom amount</option>
+        </select>
+        <input type="number" id="customAmt" placeholder="coins" style="display:none;">
+        <input type="text" id="contribNote" placeholder="note, optional">
+        <button id="addContrib">Add</button>
+      </div>
+      <div class="ledger-list" id="ledgerList"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="settings-row">
+        <span>Starting balance</span>
+        <input type="number" id="startBalance">
+        <span>Goal</span>
+        <input type="number" id="goalInput">
+        <button class="ghost" id="saveSettings">Save</button>
+        <button class="ghost" id="resetData">Reset all data</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'leetcoin-tracker-data';
+
+function todayKey(d=new Date()){
+  return d.toISOString().slice(0,10);
+}
+function weekKey(d=new Date()){
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return date.getUTCFullYear() + '-W' + String(weekNo).padStart(2,'0');
+}
+
+let data = {
+  startingBalance: 2964,
+  goal: 6500,
+  lcUsername: '',
+  lastSync: null,
+  daily: {},
+  weekly: {},
+  contributions: []
+};
+
+async function loadData(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, false);
+    if(res && res.value){
+      data = JSON.parse(res.value);
+      if(!data.daily) data.daily = {};
+      if(!data.weekly) data.weekly = {};
+      if(!data.contributions) data.contributions = [];
+      if(data.lcUsername === undefined) data.lcUsername = '';
+      if(data.lastSync === undefined) data.lastSync = null;
+    }
+  }catch(e){
+    // no existing data yet, defaults stand
+  }
+}
+
+async function saveData(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
+  }catch(e){
+    console.error('save failed', e);
+  }
+}
+
+function dailyCoins(entry){
+  if(!entry) return 0;
+  let c = 0;
+  if(entry.checkin) c += 1;
+  if(entry.challenge) c += 10;
+  return c;
+}
+function weeklyCoins(entry){
+  if(!entry) return 0;
+  let c = 0;
+  if(entry.weekly) c += 5;
+  if(entry.biweekly) c += 5;
+  if(entry.weekly && entry.biweekly) c += 25;
+  return c;
+}
+
+function totalEarned(){
+  let sum = 0;
+  Object.values(data.daily).forEach(e => sum += dailyCoins(e));
+  Object.values(data.weekly).forEach(e => sum += weeklyCoins(e));
+  data.contributions.forEach(c => sum += c.coins);
+  return sum;
+}
+
+function recentDailyAverage(days=14){
+  let sum = 0, counted = 0;
+  const now = new Date();
+  for(let i=0;i<days;i++){
+    const d = new Date(now);
+    d.setDate(d.getDate()-i);
+    const k = todayKey(d);
+    if(data.daily[k] !== undefined){
+      sum += dailyCoins(data.daily[k]);
+      counted++;
+    }
+  }
+  if(counted === 0) return null;
+  return sum / days;
+}
+
+function render(){
+  const earned = totalEarned();
+  const current = data.startingBalance + earned;
+  const remaining = Math.max(0, data.goal - current);
+  const pct = Math.min(100, (current / data.goal) * 100);
+
+  document.getElementById('currentBalance').textContent = current.toLocaleString();
+  document.getElementById('goalDisplay').textContent = data.goal.toLocaleString();
+  document.getElementById('barFill').style.width = pct.toFixed(1) + '%';
+  document.getElementById('pctLine').textContent = pct.toFixed(1) + '% to cap';
+  document.getElementById('remainingVal').textContent = remaining.toLocaleString();
+  document.getElementById('earnedVal').textContent = earned.toLocaleString();
+
+  const avg = recentDailyAverage(14);
+  const etaEl = document.getElementById('etaVal');
+  if(remaining === 0){
+    etaEl.textContent = 'reached';
+  } else if(avg && avg > 0){
+    etaEl.textContent = Math.ceil(remaining / avg) + 'd';
+  } else {
+    etaEl.textContent = '-';
+  }
+
+  const tk = todayKey();
+  const wk = weekKey();
+  const dEntry = data.daily[tk] || {};
+  const wEntry = data.weekly[wk] || {};
+  document.getElementById('checkin').checked = !!dEntry.checkin;
+  document.getElementById('challenge').checked = !!dEntry.challenge;
+  document.getElementById('weekly').checked = !!wEntry.weekly;
+  document.getElementById('biweekly').checked = !!wEntry.biweekly;
+  document.getElementById('dualRow').style.display = (wEntry.weekly && wEntry.biweekly) ? 'flex' : 'none';
+
+  document.getElementById('startBalance').value = data.startingBalance;
+  document.getElementById('goalInput').value = data.goal;
+
+  document.getElementById('lcUsername').value = data.lcUsername || '';
+  const link = document.getElementById('profileLink');
+  link.href = data.lcUsername
+    ? 'https://leetcode.com/u/' + encodeURIComponent(data.lcUsername) + '/'
+    : 'https://leetcode.com/';
+
+  const syncMsg = document.getElementById('syncMsg');
+  syncMsg.textContent = data.lastSync
+    ? 'last synced ' + data.lastSync.date + ' at ' + data.lastSync.amount.toLocaleString()
+    : '';
+
+  renderHeatmap();
+  renderLedger();
+}
+
+function renderHeatmap(){
+  const el = document.getElementById('heatmap');
+  el.innerHTML = '';
+  const now = new Date();
+  const days = [];
+  for(let i=99;i>=0;i--){
+    const d = new Date(now);
+    d.setDate(d.getDate()-i);
+    days.push(d);
+  }
+  days.forEach(d => {
+    const k = todayKey(d);
+    const c = dailyCoins(data.daily[k]);
+    const div = document.createElement('div');
+    div.className = 'cell';
+    if(c >= 11) div.className += ' l3';
+    else if(c >= 10) div.className += ' l2';
+    else if(c >= 1) div.className += ' l1';
+    div.title = k + ': ' + c + ' coins';
+    el.appendChild(div);
+  });
+}
+
+function renderLedger(){
+  const el = document.getElementById('ledgerList');
+  el.innerHTML = '';
+  if(data.contributions.length === 0){
+    el.innerHTML = '<div class="empty">No contribution entries yet.</div>';
+    return;
+  }
+  const sorted = [...data.contributions].sort((a,b) => b.date.localeCompare(a.date));
+  sorted.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'ledger-item';
+    row.innerHTML = `
+      <span><span class="desc">${c.note}</span><span class="date">${c.date}</span></span>
+      <span><span class="amt">+${c.coins}</span><span class="del" data-id="${c.id}">remove</span></span>
+    `;
+    el.appendChild(row);
+  });
+  el.querySelectorAll('.del').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = e.target.getAttribute('data-id');
+      data.contributions = data.contributions.filter(c => c.id !== id);
+      await saveData();
+      render();
+    });
+  });
+}
+
+function setupEvents(){
+  document.getElementById('checkin').addEventListener('change', async (e) => {
+    const k = todayKey();
+    if(!data.daily[k]) data.daily[k] = {};
+    data.daily[k].checkin = e.target.checked;
+    await saveData();
+    render();
+  });
+  document.getElementById('challenge').addEventListener('change', async (e) => {
+    const k = todayKey();
+    if(!data.daily[k]) data.daily[k] = {};
+    data.daily[k].challenge = e.target.checked;
+    await saveData();
+    render();
+  });
+  document.getElementById('weekly').addEventListener('change', async (e) => {
+    const k = weekKey();
+    if(!data.weekly[k]) data.weekly[k] = {};
+    data.weekly[k].weekly = e.target.checked;
+    await saveData();
+    render();
+  });
+  document.getElementById('biweekly').addEventListener('change', async (e) => {
+    const k = weekKey();
+    if(!data.weekly[k]) data.weekly[k] = {};
+    data.weekly[k].biweekly = e.target.checked;
+    await saveData();
+    render();
+  });
+
+  document.getElementById('contribType').addEventListener('change', (e) => {
+    const custom = e.target.value.startsWith('custom');
+    document.getElementById('customAmt').style.display = custom ? 'inline-block' : 'none';
+  });
+
+  document.getElementById('addContrib').addEventListener('click', async () => {
+    const sel = document.getElementById('contribType').value;
+    const [amtStr, defaultNote] = sel.split('|');
+    let coins;
+    if(amtStr === 'custom'){
+      coins = parseInt(document.getElementById('customAmt').value, 10);
+      if(!coins || coins <= 0) return;
+    } else {
+      coins = parseInt(amtStr, 10);
+    }
+    const noteInput = document.getElementById('contribNote').value.trim();
+    const note = noteInput || defaultNote;
+    data.contributions.push({
+      id: 'c' + Date.now() + Math.random().toString(36).slice(2,6),
+      coins,
+      note,
+      date: todayKey()
+    });
+    document.getElementById('contribNote').value = '';
+    document.getElementById('customAmt').value = '';
+    await saveData();
+    render();
+  });
+
+  document.getElementById('lcUsername').addEventListener('change', async (e) => {
+    data.lcUsername = e.target.value.trim();
+    await saveData();
+    render();
+  });
+
+  document.getElementById('syncBtn').addEventListener('click', async () => {
+    const amt = parseInt(document.getElementById('syncAmt').value, 10);
+    if(isNaN(amt) || amt < 0) return;
+    const earned = totalEarned();
+    data.startingBalance = amt - earned;
+    data.lastSync = { amount: amt, date: todayKey() };
+    document.getElementById('syncAmt').value = '';
+    await saveData();
+    render();
+  });
+
+  document.getElementById('saveSettings').addEventListener('click', async () => {
+    const sb = parseInt(document.getElementById('startBalance').value, 10);
+    const g = parseInt(document.getElementById('goalInput').value, 10);
+    if(!isNaN(sb)) data.startingBalance = sb;
+    if(!isNaN(g)) data.goal = g;
+    await saveData();
+    render();
+  });
+
+  document.getElementById('resetData').addEventListener('click', async () => {
+    if(!confirm('Clear all tracked days and contributions? Starting balance and goal are kept.')) return;
+    data.daily = {};
+    data.weekly = {};
+    data.contributions = [];
+    await saveData();
+    render();
+  });
+}
+
+(async function init(){
+  await loadData();
+  setupEvents();
+  render();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+})();
+</script>
+</body>
+</html>
