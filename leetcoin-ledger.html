@@ -380,9 +380,9 @@ let data = {
 
 async function loadData(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    if(res && res.value){
-      data = JSON.parse(res.value);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      data = JSON.parse(raw);
       if(!data.daily) data.daily = {};
       if(!data.weekly) data.weekly = {};
       if(!data.contributions) data.contributions = [];
@@ -390,13 +390,13 @@ async function loadData(){
       if(data.lastSync === undefined) data.lastSync = null;
     }
   }catch(e){
-    // no existing data yet, defaults stand
+    // no existing data yet, or storage unavailable - defaults stand
   }
 }
 
 async function saveData(){
   try{
-    await window.storage.set(STORAGE_KEY, JSON.stringify(data), false);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }catch(e){
     console.error('save failed', e);
   }
@@ -426,19 +426,37 @@ function totalEarned(){
   return sum;
 }
 
-function recentDailyAverage(days=14){
-  let sum = 0, counted = 0;
+function recentAverage(days=14){
   const now = new Date();
+  let sum = 0;
+  let hasAnyEntry = false;
+  const weekKeysInRange = new Set();
   for(let i=0;i<days;i++){
     const d = new Date(now);
     d.setDate(d.getDate()-i);
-    const k = todayKey(d);
-    if(data.daily[k] !== undefined){
-      sum += dailyCoins(data.daily[k]);
-      counted++;
+    const dk = todayKey(d);
+    if(data.daily[dk] !== undefined){
+      sum += dailyCoins(data.daily[dk]);
+      hasAnyEntry = true;
     }
+    weekKeysInRange.add(weekKey(d));
   }
-  if(counted === 0) return null;
+  weekKeysInRange.forEach(wk => {
+    if(data.weekly[wk] !== undefined){
+      sum += weeklyCoins(data.weekly[wk]);
+      hasAnyEntry = true;
+    }
+  });
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  const cutoffKey = todayKey(cutoff);
+  data.contributions.forEach(c => {
+    if(c.date >= cutoffKey){
+      sum += c.coins;
+      hasAnyEntry = true;
+    }
+  });
+  if(!hasAnyEntry) return null;
   return sum / days;
 }
 
@@ -455,7 +473,7 @@ function render(){
   document.getElementById('remainingVal').textContent = remaining.toLocaleString();
   document.getElementById('earnedVal').textContent = earned.toLocaleString();
 
-  const avg = recentDailyAverage(14);
+  const avg = recentAverage(14);
   const etaEl = document.getElementById('etaVal');
   if(remaining === 0){
     etaEl.textContent = 'reached';
