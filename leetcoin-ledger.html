@@ -235,6 +235,10 @@
   <h1>Grind tracker</h1>
 
   <div id="loading" class="loading">loading ledger...</div>
+  <div id="storageWarning" class="panel" style="display:none;border-color:var(--rust);">
+    <h2 style="color:var(--rust);">Storage unavailable</h2>
+    <p class="empty" style="margin:0;">This browser blocks local storage for files opened directly (common in Firefox). Progress won't survive a reload on its own — use <strong>Export backup</strong> in Settings before closing, and <strong>Import backup</strong> next time to restore it.</p>
+  </div>
 
   <div id="app" style="display:none;">
 
@@ -340,13 +344,19 @@
 
     <div class="panel">
       <h2>Settings</h2>
-      <div class="settings-row">
+      <div class="settings-row" style="margin-bottom:12px;">
         <span>Starting balance</span>
         <input type="number" id="startBalance">
         <span>Goal</span>
         <input type="number" id="goalInput">
         <button class="ghost" id="saveSettings">Save</button>
         <button class="ghost" id="resetData">Reset all data</button>
+      </div>
+      <div class="settings-row">
+        <button class="ghost" id="exportBtn">Export backup</button>
+        <button class="ghost" id="importBtn">Import backup</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+        <span id="ioMsg" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green);"></span>
       </div>
     </div>
 
@@ -378,23 +388,41 @@ let data = {
   contributions: []
 };
 
+function detectStorage(){
+  try{
+    const probeKey = STORAGE_KEY + '-probe';
+    localStorage.setItem(probeKey, '1');
+    localStorage.removeItem(probeKey);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+const storageAvailable = detectStorage();
+
+function normalizeData(){
+  if(!data.daily) data.daily = {};
+  if(!data.weekly) data.weekly = {};
+  if(!data.contributions) data.contributions = [];
+  if(data.lcUsername === undefined) data.lcUsername = '';
+  if(data.lastSync === undefined) data.lastSync = null;
+}
+
 async function loadData(){
+  if(!storageAvailable) return;
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       data = JSON.parse(raw);
-      if(!data.daily) data.daily = {};
-      if(!data.weekly) data.weekly = {};
-      if(!data.contributions) data.contributions = [];
-      if(data.lcUsername === undefined) data.lcUsername = '';
-      if(data.lastSync === undefined) data.lastSync = null;
+      normalizeData();
     }
   }catch(e){
-    // no existing data yet, or storage unavailable - defaults stand
+    // no existing data yet - defaults stand
   }
 }
 
 async function saveData(){
+  if(!storageAvailable) return;
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }catch(e){
