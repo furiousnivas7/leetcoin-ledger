@@ -309,7 +309,7 @@
       </div>
       <div class="check-row" id="dualRow" style="display:none;">
         <label>Both contests bonus</label>
-        <span class="coin-tag">+25</span>
+        <span class="coin-tag" id="dualBonusTag">+25</span>
       </div>
     </div>
 
@@ -431,19 +431,30 @@ async function saveData(){
   }
 }
 
+// LeetCode publishes no official rate card for any of this. Values are user-reported
+// (LeetCode Discuss #3620981) and have drifted before, so they're centralized here as
+// the one place to update if they change again.
+const REWARDS = {
+  checkin: 1,
+  challenge: 10,
+  weeklyContest: 5,
+  biweeklyContest: 5,
+  dualContestBonus: 35, // single-sourced estimate; mission is confirmed to exist, exact figure is not
+};
+
 function dailyCoins(entry){
   if(!entry) return 0;
   let c = 0;
-  if(entry.checkin) c += 1;
-  if(entry.challenge) c += 10;
+  if(entry.checkin) c += REWARDS.checkin;
+  if(entry.challenge) c += REWARDS.challenge;
   return c;
 }
 function weeklyCoins(entry){
   if(!entry) return 0;
   let c = 0;
-  if(entry.weekly) c += 5;
-  if(entry.biweekly) c += 5;
-  if(entry.weekly && entry.biweekly) c += 25;
+  if(entry.weekly) c += REWARDS.weeklyContest;
+  if(entry.biweekly) c += REWARDS.biweeklyContest;
+  if(entry.weekly && entry.biweekly) c += REWARDS.dualContestBonus;
   return c;
 }
 
@@ -521,6 +532,7 @@ function render(){
   document.getElementById('weekly').checked = !!wEntry.weekly;
   document.getElementById('biweekly').checked = !!wEntry.biweekly;
   document.getElementById('dualRow').style.display = (wEntry.weekly && wEntry.biweekly) ? 'flex' : 'none';
+  document.getElementById('dualBonusTag').textContent = '+' + REWARDS.dualContestBonus;
 
   document.getElementById('startBalance').value = data.startingBalance;
   document.getElementById('goalInput').value = data.goal;
