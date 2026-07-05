@@ -21,9 +21,12 @@ tests to run.** Don't add any of those without being asked.
 
 ## Guardrails (the ones that will bite if ignored)
 
-- **Never touch session cookies / auth tokens.** The design avoids credentials entirely
-  by running in the user's logged-in tab. Never read `document.cookie` or transmit
-  session data.
+- **Never touch session cookies / auth tokens in the tracker or extension.** The design
+  avoids credentials entirely by running in the user's logged-in tab. Never read
+  `document.cookie` or transmit session data from those two components.
+  **Exception:** `cookie-sync/` is a separate, isolated, opt-in tool the user chose
+  after the extension's selector flow proved too fiddly — see its own README. Don't
+  extend that pattern into the tracker or extension.
 - **Never add a backend, proxy, or cloud service.** If a task seems to need one, stop and
   say so — it's out of scope.
 - **Never fetch `leetcode.com` from the tracker page** — blocked by CORS, by design. The

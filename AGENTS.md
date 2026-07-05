@@ -38,10 +38,16 @@ in every change:
 
 ## Hard rules (do not violate)
 
-- **Never handle a session cookie.** The whole design exists to avoid this. The
-  extension reads data because it runs in the user's already-logged-in tab, not because
-  it holds a credential. Never read, store, transmit, or ask for `document.cookie`, auth
-  tokens, or session data.
+- **Never handle a session cookie *inside the tracker or the extension*.** The whole
+  design of those two components exists to avoid this. The extension reads data
+  because it runs in the user's already-logged-in tab, not because it holds a
+  credential. Never read, store, transmit, or ask for `document.cookie`, auth tokens,
+  or session data from `leetcoin-ledger.html` or anything in `extension/`.
+  **Documented exception:** `cookie-sync/` is a separate, opt-in, gitignored-secrets
+  tool the user explicitly chose to add after the extension's DOM-selector workflow
+  proved too fiddly to use. It's isolated on purpose — see `cookie-sync/README.md` for
+  the risk tradeoff. Don't wire it into the tracker or extension; don't expand its
+  blast radius.
 - **Never add a backend / server / proxy / cloud service.** If a task seems to need one,
   stop and flag it — it almost certainly means the task is out of scope for this tool.
 - **Never fetch `leetcode.com` from the tracker page.** It's blocked by CORS and that's
@@ -87,9 +93,10 @@ Key handshake details:
 |---|---|---|
 | `leetcoin-ledger.html` | Tracker UI + ledger logic + `localStorage` | Keep the Firefox `file://` `localStorage` detection + warning banner + Export/Import JSON fallback. Keep the `<meta name="leetcoin-tracker">` tag. |
 | `extension/manifest.json` | MV3 config | Least privilege. Don't widen host permissions. |
-| `extension/content-leetcode.js` | Scrapes leetcode.com → `chrome.storage.local` | Text-heuristic scraping is intentionally fuzzy (no stable selectors). Keep it resilient and side-effect-free on the page. |
+| `extension/content-leetcode.js` | Reads balance + scrapes leetcode.com → `chrome.storage.local` | Balance comes from a same-origin `fetch('/points/api/total/')` first (real endpoint, found via Network tab — not guessed), falling back to text-heuristic DOM scraping. Rank/streak/solved have no known endpoint yet, so they're heuristic-only. Keep the fallback resilient and side-effect-free on the page. |
 | `extension/content-tracker.js` | Runs on tracker file; auto-fills + clicks Sync | Keep the meta-tag guard and the idempotency check. |
 | `extension/popup.html` / `popup.js` | Dashboard, re-scan, copy fallback, per-field CSS selector override | The selector override is the primary resilience mechanism — don't remove it. |
+| `cookie-sync/` | **Optional, opt-in, higher-risk** manual balance fetch using the user's real session cookie | Isolated on purpose. Secrets live only in gitignored `.local` files (`.env.local`, `query.local.json`). Doesn't write into the tracker — output is pasted into Sync by hand. |
 
 ---
 

@@ -1,0 +1,3 @@
+# Local secrets for the optional cookie-sync tool. Never commit these.
+cookie-sync/.env.local
+cookie-sync/query.local.json

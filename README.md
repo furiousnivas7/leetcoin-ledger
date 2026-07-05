@@ -106,6 +106,12 @@ over `http://localhost`. (The extension itself is Chrome-only.)
 Confirm **Allow access to file URLs** is on for the extension, the tracker tab is open,
 and the popup is actually showing a scraped balance.
 
+**DevTools' element picker is too fiddly to get a selector.**
+There's a separate, opt-in fallback in `cookie-sync/` that fetches your balance using
+your real LeetCode session cookie instead of a CSS selector. It's higher-risk (that
+cookie is a live credential) and deliberately isolated from the tracker/extension —
+read `cookie-sync/README.md` before using it.
+
 ---
 
 ## Project structure
@@ -119,6 +125,7 @@ and the popup is actually showing a scraped balance.
 │   ├── content-tracker.js    # runs on tracker file, auto-fills + clicks Sync
 │   ├── popup.html
 │   └── popup.js              # dashboard, re-scan, copy fallback, selector override
+├── cookie-sync/               # optional, higher-risk manual fetch - see its own README
 ├── README.md
 ├── AGENTS.md                 # guidance for AI coding agents (source of truth)
 └── CLAUDE.md                 # Claude Code pointer + guardrails

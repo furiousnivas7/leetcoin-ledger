@@ -1,0 +1,4 @@
+{
+  "query": "PASTE the exact \"query\" string from the captured /graphql request here",
+  "variables": {}
+}

@@ -57,13 +57,74 @@
     return null;
   }
 
+  // LeetCode's own "Your Points" widget calls this same endpoint - found via
+  // DevTools Network tab, not guessed. Since this runs as a same-origin fetch
+  // from inside the real, already-authenticated leetcode.com tab, the browser
+  // attaches cookies and passes Cloudflare's checks automatically - unlike a
+  // standalone script replaying a copied cookie, which gets bot-challenged.
+  // Far more reliable than DOM scraping, so it's tried first for balance.
+  async function fetchRealBalance() {
+    try {
+      const res = await fetch('/points/api/total/', { credentials: 'include' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return typeof data.points === 'number' ? data.points : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Same idea as fetchRealBalance, but via /graphql - this is the exact
+  // "globalData" query LeetCode's own frontend fires on most pages, captured
+  // from DevTools Network tab. /graphql isn't Cloudflare-challenged the way
+  // /points/api/total/ is, so this works from a plain same-origin fetch too.
+  async function fetchRealStreak() {
+    try {
+      const res = await fetch('/graphql', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operationName: 'globalData',
+          query: `query globalData {
+            streakCounter {
+              streakCount
+              __typename
+            }
+          }`,
+          variables: {},
+        }),
+      });
+      if (!res.ok) return null;
+      const { data } = await res.json();
+      const count = data?.streakCounter?.streakCount;
+      return typeof count === 'number' ? count : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function scan() {
     const { leetcoinSelectorOverrides } = await chrome.storage.local.get('leetcoinSelectorOverrides');
     const overrides = leetcoinSelectorOverrides || {};
     const found = {};
     const sources = {};
 
+    const apiBalance = await fetchRealBalance();
+    if (apiBalance !== null) {
+      found.balance = apiBalance;
+      sources.balance = 'api';
+    }
+
+    const apiStreak = await fetchRealStreak();
+    if (apiStreak !== null) {
+      found.streak = apiStreak;
+      sources.streak = 'api';
+    }
+
     for (const [field, cfg] of Object.entries(FIELDS)) {
+      if (field === 'balance' && apiBalance !== null) continue; // API already won
+      if (field === 'streak' && apiStreak !== null) continue; // API already won
       let value = tryOverrideSelector(overrides[field], cfg.max);
       let source = 'override';
       if (value === null) {
@@ -92,12 +153,27 @@
     }
   }
 
-  scan();
-  setInterval(scan, 5000);
+  // When the extension is reloaded (chrome://extensions) while this tab is
+  // still open, this orphaned copy of the script can no longer reach
+  // chrome.storage - every call throws "Extension context invalidated."
+  // Stop polling instead of spamming that error forever; reloading the tab
+  // (not just the extension) is what actually fixes it.
+  function isContextInvalidated(e) {
+    return typeof e?.message === 'string' && e.message.includes('Extension context invalidated');
+  }
+
+  const intervalId = setInterval(() => {
+    scan().catch((e) => {
+      if (isContextInvalidated(e)) clearInterval(intervalId);
+    });
+  }, 5000);
+  scan().catch((e) => {
+    if (isContextInvalidated(e)) clearInterval(intervalId);
+  });
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg && msg.type === 'leetcoin-rescan') {
-      scan().then(() => sendResponse({ ok: true }));
+      scan().then(() => sendResponse({ ok: true })).catch((e) => sendResponse({ ok: false, error: e.message }));
       return true;
     }
   });
