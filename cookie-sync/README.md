@@ -17,6 +17,25 @@ to copy that value into a local file. Treat it exactly like a password:
 - When you're done experimenting, you can revoke it for real by logging out of
   leetcode.com (that invalidates the session server-side).
 
+## Verified result: use the extension instead for balance
+
+Confirmed by actually running this: fetching your balance from a standalone script
+hits Cloudflare's bot challenge (HTTP 403, `cf-mitigated: challenge`, a "Just a
+moment..." page) — even with a valid, freshly-copied cookie and matching browser
+headers. This isn't a bug to fix; Cloudflare ties its challenge to browser-level
+signals (TLS fingerprint, JS execution) that a Node script can't reproduce just by
+copying headers. Both `points.mjs` (the REST endpoint) and `balance.mjs` (the GraphQL
+approach, see Steps 1-2 below) hit this same wall.
+
+**This is exactly why the Chrome extension calls these same endpoints instead** (see
+`extension/content-leetcode.js`) — from inside a real, already-authenticated
+leetcode.com tab, it's a same-origin request the browser handles like any other, no
+challenge triggered. Balance and Streak are both confirmed working live that way. If
+you just want your balance/streak automated, **use the extension, not this folder.**
+
+The steps below are kept for reference/exploration (e.g. if you want to understand
+LeetCode's private API shape), not because they're the recommended path anymore.
+
 ## Step 1 - get your cookie values and confirm they work
 
 1. On `leetcode.com`, open DevTools -> **Application** tab (Chrome) -> **Cookies** ->
@@ -27,8 +46,10 @@ to copy that value into a local file. Treat it exactly like a password:
    ```
    node --env-file=cookie-sync/.env.local cookie-sync/whoami.mjs
    ```
-   You should see `Authenticated as: <your username>`. If it says "Not signed in,"
-   the cookie is stale - copy it again from a fresh page load.
+   You should see `Authenticated as: <your username>`. This one genuinely works -
+   `/graphql`'s `userStatus`/`globalData` queries aren't challenge-protected, only the
+   balance-specific calls are. If it says "Not signed in," the cookie is stale - copy
+   it again from a fresh page load.
 
 ## Step 2 - capture LeetCode's own real balance query (don't guess it)
 
@@ -40,36 +61,23 @@ the *exact* query LeetCode's own frontend sends:
 2. Visit whatever page actually shows your coin balance (try the little coin icon near
    your avatar, or `leetcode.com/store/`).
 3. In the Network list, find the `POST /graphql` request that fired around then. Click
-   it -> **Payload** (or **Request**) tab.
+   it -> **Headers** tab, scroll down to the request payload section.
 4. Copy the `query` string and the `variables` object.
 5. `cp cookie-sync/query.local.json.example cookie-sync/query.local.json` and paste
    both in.
 
-## Step 3 - run it
+## Step 3 - run it (will 403, and that's expected)
 
 ```
 node --env-file=cookie-sync/.env.local cookie-sync/balance.mjs
 ```
 
-This prints the full raw response as JSON. Find the number that matches your real
-balance in there, and tell me its field path (e.g. `data.userProfile.coins`) - I'll
-add a one-line extractor so it just prints the number.
-
-## Known limitation: the points endpoint is Cloudflare-challenged
-
-`https://leetcode.com/points/api/total/` (the endpoint that returns `{"points": N}`)
-returns a Cloudflare "Just a moment..." managed-challenge page (HTTP 403,
-`cf-mitigated: challenge`) when called from a plain script with a replayed cookie —
-even with a valid session and matching headers. Cloudflare ties its challenge to
-browser-level signals (TLS fingerprint, JS execution, etc.) that a Node `fetch()`
-can't reproduce by copying headers alone.
-
-**This is exactly why the Chrome extension calls this same endpoint instead** (see
-`extension/content-leetcode.js`) — from inside a real, already-authenticated
-leetcode.com tab, it's a same-origin request the browser handles like any other,
-no challenge triggered. If you just want your balance automated, prefer the
-extension over pushing further on this script. `whoami.mjs` still works fine since
-`/graphql` isn't challenge-protected the same way.
+This will hit the Cloudflare wall described above. `points.mjs` (a simpler, REST-based
+attempt at the same thing) hits the identical wall - run it the same way if you want to
+see for yourself:
+```
+node --env-file=cookie-sync/.env.local cookie-sync/points.mjs
+```
 
 ## What this does NOT do
 

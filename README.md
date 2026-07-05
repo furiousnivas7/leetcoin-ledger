@@ -48,7 +48,9 @@ So the project is deliberately split into a **local HTML tracker** plus a small
 ## Daily use
 
 - Browse `leetcode.com` normally while logged in. The extension silently picks up
-  your **balance** on most pages, and **rank / streak / solved** on your profile page.
+  your **balance** and **streak** from anywhere on the site (real API calls), and
+  **rank / solved** specifically while you're on your profile page (manual selector
+  override, since those two don't have a known API yet).
 - Whenever the tracker file is open and a new balance is available, it **auto-syncs** —
   no copy-paste needed day to day.
 - You still tick the **daily / weekly checkboxes** and add **contribution entries** by
@@ -63,8 +65,9 @@ So the project is deliberately split into a **local HTML tracker** plus a small
 ```
 leetcode.com tab                chrome.storage.local           tracker file tab
 content-leetcode.js  --writes-->  { balance, rank,   --reads-->  content-tracker.js
- (scrapes DOM ~5s)                  streak, solved,              (auto-fill + click Sync,
-                                    selectorOverrides }           idempotent)
+ (balance+streak via     ~5s        streak, solved,              (auto-fill + click Sync,
+  real API, rank+solved             selectorOverrides }           idempotent)
+  via manual override)
         ^                                 ^                               |
    popup.html/js  --------read/write------+                              v
    (dashboard, re-scan, copy fallback, CSS selector override)   leetcoin-ledger.html
@@ -92,10 +95,12 @@ content-leetcode.js  --writes-->  { balance, rank,   --reads-->  content-tracker
 ## Troubleshooting
 
 **A stat shows blank or wrong in the popup.**
-LeetCode has no stable public CSS selectors, so a site layout change can break the
-scraping heuristic. Open the popup, use the **manual CSS-selector override** for that
-field to point it at the right element, and it'll stick. Copy-to-clipboard is there as
-a fallback if you'd rather paste manually.
+Balance/Streak use real API calls, so if either breaks it most likely means LeetCode
+changed that endpoint. Rank/Solved use a manual CSS selector (no known API for those
+yet), so a LeetCode layout change can break them more easily. Either way: open the
+popup, use the **manual CSS-selector override** for that field to point it at the right
+element, and it'll stick. Copy-to-clipboard is there as a fallback if you'd rather paste
+manually.
 
 **Firefox: the tracker doesn't remember anything.**
 Firefox blocks `localStorage` on `file://` pages. The tracker detects this and shows a
@@ -128,17 +133,17 @@ read `cookie-sync/README.md` before using it.
 ├── cookie-sync/               # optional, higher-risk manual fetch - see its own README
 ├── README.md
 ├── AGENTS.md                 # guidance for AI coding agents (source of truth)
-└── CLAUDE.md                 # Claude Code pointer + guardrails
+├── CLAUDE.md                 # Claude Code pointer + guardrails
+└── LICENSE                   # MIT
 ```
 
 ---
 
 ## Status
 
-MVP built; the Chrome extension is the chosen path. **One item is still open:** the
-DOM scraping has not yet been verified against the real, live, logged-in
-`leetcode.com` page. Until you've watched the popup pull your real balance once, treat
-the scraping layer as unverified — however clean the code looks.
+MVP built and **verified against a real, live, logged-in account**: Balance and Streak
+come from real LeetCode API calls, Rank and Solved from a manual selector override set
+through the popup. All four were confirmed showing correct live values.
 
 ## Scope (deliberately *not* doing)
 
@@ -146,3 +151,7 @@ This is a personal tool for one user. By design there is **no** server, backend 
 CI/CD, container, database, auth system, or public-stats dashboard. Those would be
 over-engineering for cosmetic data relative to the one number (the balance) that feeds
 the goal math. Keep it this way unless a real need appears.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

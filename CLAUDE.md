@@ -63,15 +63,18 @@ don't stand up a framework for it.
 - `leetcoin-ledger.html` — tracker UI, ledger logic, `localStorage` (+ Firefox `file://`
   detection/warning and Export/Import JSON fallback — keep these).
 - `extension/manifest.json` — MV3, least privilege.
-- `extension/content-leetcode.js` — scrapes leetcode.com → `chrome.storage.local`.
+- `extension/content-leetcode.js` — Balance + Streak via real API calls (confirmed
+  working live); Rank + Solved via manual selector override (heuristic as last-resort
+  fallback, which has never once succeeded against the real site) → `chrome.storage.local`.
 - `extension/content-tracker.js` — runs on the tracker file only; auto-fills + clicks Sync.
 - `extension/popup.html` / `popup.js` — dashboard, re-scan, copy fallback, per-field CSS
   selector override (the primary resilience mechanism — don't remove it).
 
 ---
 
-## Open item
+## Verified
 
-DOM scraping is **not yet verified** against the real logged-in `leetcode.com` page. When
-a field misses, fix the **selector** (via the popup override), not the symptom. See
-`AGENTS.md` → "Known open item".
+All four fields (Balance, Streak, Rank, Solved) have been confirmed working against a
+real logged-in account. When a field ever misses again (site change), fix the
+**selector or endpoint** (via the popup override), not the symptom. See `AGENTS.md` →
+"Verified against the real, live, logged-in page".

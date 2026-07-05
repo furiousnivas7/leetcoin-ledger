@@ -68,8 +68,9 @@ in every change:
 ```
 leetcode.com tab                chrome.storage.local           tracker file tab
 content-leetcode.js  --writes-->  { balance, rank,   --reads-->  content-tracker.js
- (scrapes DOM ~5s)                  streak, solved,              (auto-fill + click Sync,
-                                    selectorOverrides }           idempotent)
+ (balance+streak via     ~5s        streak, solved,              (auto-fill + click Sync,
+  real API, rank+solved             selectorOverrides }           idempotent)
+  via override/heuristic)
         ^                                 ^                               |
    popup.html/js  --------read/write------+                              v
    (dashboard, re-scan, copy fallback, CSS selector override)   leetcoin-ledger.html
@@ -93,7 +94,7 @@ Key handshake details:
 |---|---|---|
 | `leetcoin-ledger.html` | Tracker UI + ledger logic + `localStorage` | Keep the Firefox `file://` `localStorage` detection + warning banner + Export/Import JSON fallback. Keep the `<meta name="leetcoin-tracker">` tag. |
 | `extension/manifest.json` | MV3 config | Least privilege. Don't widen host permissions. |
-| `extension/content-leetcode.js` | Reads balance + scrapes leetcode.com → `chrome.storage.local` | Balance comes from a same-origin `fetch('/points/api/total/')` first (real endpoint, found via Network tab — not guessed), falling back to text-heuristic DOM scraping. Rank/streak/solved have no known endpoint yet, so they're heuristic-only. Keep the fallback resilient and side-effect-free on the page. |
+| `extension/content-leetcode.js` | Reads balance/streak + scrapes leetcode.com → `chrome.storage.local` | Balance (`fetch('/points/api/total/')`) and Streak (`fetch('/graphql')`, `globalData` query, `streakCounter.streakCount`) come from real endpoints found via Network tab — not guessed. Both are confirmed working live. Rank and Solved have no known endpoint yet; they use a per-field manual CSS-selector override (set via the popup), falling back to text-heuristic DOM scraping only if no override is set. In practice the bare heuristic has never once succeeded against the real site — treat it as a weak last resort, not a realistic default. Keep the fallback resilient and side-effect-free on the page. |
 | `extension/content-tracker.js` | Runs on tracker file; auto-fills + clicks Sync | Keep the meta-tag guard and the idempotency check. |
 | `extension/popup.html` / `popup.js` | Dashboard, re-scan, copy fallback, per-field CSS selector override | The selector override is the primary resilience mechanism — don't remove it. |
 | `cookie-sync/` | **Optional, opt-in, higher-risk** manual balance fetch using the user's real session cookie | Isolated on purpose. Secrets live only in gitignored `.local` files (`.env.local`, `query.local.json`). Doesn't write into the tracker — output is pasted into Sync by hand. |
@@ -102,21 +103,33 @@ Key handshake details:
 
 ## Data shapes
 
-`chrome.storage.local` (extension side) — plain structured-cloneable key/value:
+`chrome.storage.local` (extension side) holds several **top-level keys** (not nested
+inside each other):
 
 ```jsonc
+// key: "leetcoinScrape" - the last successful read of each field
 {
-  "balance": 1234,           // last scraped LeetCoin balance (number | null)
-  "rank": 45210,             // profile page only
-  "streak": 30,
-  "solved": 512,
-  "lastScrapedAt": 1730000000000,   // epoch ms — powers the staleness indicator
-  "selectorOverrides": {     // user-set CSS selectors when heuristics miss
-    "balance": ".some-selector",
-    "rank": null
-  }
+  "balance": 2997,           // via the /points/api/total/ endpoint
+  "streak": 5,                // via the /graphql globalData query
+  "rank": 194914,             // via manual selector override
+  "solved": 505,              // via manual selector override
+  "sources": {                 // where each field's value actually came from
+    "balance": "api", "streak": "api", "rank": "override", "solved": "override"
+    // possible values: "api" | "override" | "heuristic"
+  },
+  "scrapedAt": 1730000000000   // epoch ms - powers the popup's staleness indicator
 }
+
+// key: "leetcoinScrapeStatus" - only set when balance specifically isn't found
+{ "found": false, "checkedAt": 1730000000000 }
+
+// key: "leetcoinSelectorOverrides" - user-set CSS selectors, one per field
+{ "balance": null, "rank": "#__next > ... > span", "streak": null, "solved": "#__next > ... > span" }
 ```
+
+Fields merge on every scan rather than overwrite, so navigating off the profile page
+(where rank/streak/solved live) doesn't erase values found earlier - see `scan()` in
+`content-leetcode.js`.
 
 `localStorage` (tracker side) — a single JSON blob: the ledger entries, the goal config,
 and the sync-calibration offset (the paste-in baseline that history is measured from).
@@ -154,9 +167,18 @@ is welcome — but don't stand up a heavy test framework for this.
 
 ---
 
-## Known open item
+## Verified against the real, live, logged-in page
 
-The DOM scraping has **not** been verified against the real, live, logged-in
-`leetcode.com` page. Until then, treat the scraping layer as unverified. When a field
-misses: inspect the popup (found vs missing), find the right element in DevTools, set the
-CSS override, confirm it sticks. Fix the root cause (selector), don't hard-code a value.
+All four fields have been confirmed working against a real account (not simulated):
+Balance and Streak via their real API calls, Rank and Solved via manual selector
+override set through the popup. The bare DOM heuristic was tried first for every field
+and **failed every single time** against the real site (no `aria-label`/`title`/
+`data-testid`/`class` on LeetCode's current markup contains "coin"/"rank"/"streak"/
+"solved") - this isn't a bug to fix, it's the expected outcome of scraping a site with
+hashed/generated class names, and it's exactly why the override mechanism exists as a
+first-class feature rather than a rare fallback.
+
+If a field ever goes blank again (LeetCode changes its markup or endpoint): inspect the
+popup (found vs missing, and the `sources` field for what last worked), find the right
+element in DevTools, set the CSS override, confirm it sticks. Fix the root cause
+(selector or endpoint), don't hard-code a value.
